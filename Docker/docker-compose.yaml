@@ -1,0 +1,219 @@
+services:
+  # redis配置
+  redis:
+    image: bitnami/redis:latest
+    restart: always
+    container_name: redis
+    environment:
+      - REDIS_PASSWORD=123456
+    ports:
+      - '6379:6379'
+    volumes:
+      - /app/data/redis/redis-data:/bitnami/redis/data
+      - /app/data/redis/redis-conf:/opt/bitnami/redis/mounted-etc
+      - /etc/localtime:/etc/localtime:ro
+
+  # mysql配置
+  mysql:
+    image: mysql:8.0.31
+    restart: always
+    container_name: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+    ports:
+      - '3306:3306'
+      - '33060:33060'
+    volumes:
+      - /app/data/mysql/mysql-conf:/etc/mysql/conf.d
+      - /app/data/mysql/mysql-data:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+
+  # zookeeper配置
+
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    container_name: zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    volumes:
+      - /app/data/zookeeper/zookeeper_data:/bitnami
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  # kafka配置
+
+  kafka:
+    image: 'bitnami/kafka:3.4'
+    container_name: kafka
+    restart: always
+    hostname: kafka
+    ports:
+      - '9092:9092'
+      - '9094:9094'
+    environment:
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://0.0.0.0:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://192.168.224.100:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - "KAFKA_HEAP_OPTS=-Xmx512m -Xms512m"
+    volumes:
+      - /app/data/kafka/kafka-conf:/bitnami/kafka/config
+      - /app/data/kafka/kafka-data:/bitnami/kafka/data
+      - /etc/localtime:/etc/localtime:ro
+
+  # kafka-ui配置
+
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    restart: always
+    ports:
+      - 8085:8080
+    environment:
+      DYNAMIC_CONFIG_ENABLED: true
+      KAFKA_CLUSTERS_0_NAME: kafka-dev
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    volumes:
+      - /app/data/kafka-ui/kafkaui-app:/etc/kafkaui
+      - /etc/localtime:/etc/localtime:ro
+
+  # nacos配置
+
+  nacos:
+    image: nacos/nacos-server:v2.3.1
+    container_name: nacos
+    ports:
+      - 8848:8848
+      - 9848:9848
+    environment:
+      - PREFER_HOST_MODE=hostname
+      - MODE=standalone
+      - JVM_XMX=512m
+      - JVM_XMS=512m
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_SERVICE_HOST=nacos-mysql
+      - MYSQL_SERVICE_DB_NAME=nacos_devtest
+      - MYSQL_SERVICE_PORT=3306
+      - MYSQL_SERVICE_USER=nacos
+      - MYSQL_SERVICE_PASSWORD=nacos
+      - MYSQL_SERVICE_DB_PARAM=characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      - NACOS_AUTH_IDENTITY_KEY=2222
+      - NACOS_AUTH_IDENTITY_VALUE=2xxx
+      - NACOS_AUTH_TOKEN=SecretKey012345678901234567890123456789012345678901234567890123456789
+      - NACOS_AUTH_ENABLE=true
+    volumes:
+      - /app/data/nacos/nacos-logs:/home/nacos/logs
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      nacos-mysql:
+        condition: service_healthy
+
+  # nacos-mysql持久化配置
+
+  nacos-mysql:
+    container_name: nacos-mysql
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM mysql:8.0.31
+        ADD https://raw.githubusercontent.com/alibaba/nacos/2.3.2/distribution/conf/mysql-schema.sql /docker-entrypoint-initdb.d/nacos-mysql.sql
+        RUN chown -R mysql:mysql /docker-entrypoint-initdb.d/nacos-mysql.sql
+        EXPOSE 3306
+        CMD ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    image: nacos/mysql:8.0.30
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=nacos_devtest
+      - MYSQL_USER=nacos
+      - MYSQL_PASSWORD=nacos
+      - LANG=C.UTF-8
+    volumes:
+      - /app/data/nacos/nacos-mysqldata:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "13306:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  # rocketmq-namesrv配置
+
+  namesrv:
+    image: apache/rocketmq:5.3.1
+    container_name: rmqnamesrv
+    ports:
+      - 9876:9876
+    networks:
+      - rocketmq
+    command: sh mqnamesrv
+
+  # rocketmq-broker配置    
+
+  broker:
+    image: apache/rocketmq:5.3.1
+    container_name: rmqbroker
+    ports:
+      - 10909:10909
+      - 10911:10911
+      - 10912:10912
+    environment:
+      - NAMESRV_ADDR=192.168.224.100:9876
+    depends_on:
+      - namesrv
+    networks:
+      - rocketmq
+    command: sh mqbroker
+
+  # rocketmq-proxy配置
+
+  proxy:
+    image: apache/rocketmq:5.3.1
+    container_name: rmqproxy
+    networks:
+      - rocketmq
+    depends_on:
+      - broker
+      - namesrv
+    ports:
+      - 8082:8080
+      - 8081:8081
+    restart: on-failure
+    environment:
+      - NAMESRV_ADDR=192.168.224.100:9876
+    command: sh mqproxy
+  
+  # rocketmq-dasboard配置
+
+  rocketmq-dashboard:
+    container_name: rocketmq-dashboard
+    image: apacherocketmq/rocketmq-dashboard:latest
+    networks:
+      - rocketmq
+    environment:
+      JAVA_OPTS: "-Drocketmq.namesrv.addr=192.168.224.100:9876"
+    ports:
+      - 8088:8080
+
+  # sentinel配置
+  sentinel:
+    container_name: sentinel
+    image: bladex/sentinel-dashboard:latest
+    environment:
+      - JVM_XMX=512m
+      - JVM_XMS=512m
+    ports:
+      - 8858:8858
+  
+# 网络配置，rocketmq节点需要在同一个网络中进行通信
+networks:
+  rocketmq:
+    driver: bridge
+
