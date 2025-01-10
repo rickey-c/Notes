@@ -37,7 +37,7 @@ sudo vi /etc/docker/daemon.json
 sudo service docker restart
 ```
 
-#####方式二：使用代理
+##### 方式二：使用代理
 
 对于虚拟机直接使用Tun代理可以快速解决问题
 
@@ -62,7 +62,7 @@ sudo service docker restart
 docker pull hub.rat.dev/<镜像名>:[版本号]
 ```
 
-#####方式二：配置代理
+##### 方式二：配置代理
 
 （据说可能导致服务器被查封，因此我选择的是方式一.镜像换源）
 
