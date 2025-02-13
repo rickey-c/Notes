@@ -1,0 +1,58 @@
+# 高精度乘法
+
+## 题目描述：
+
+使用字符串实现高精度乘法
+
+## 解题思路：
+
+先计算字符串的长度，然后使用int[]记录结果，最后使用StringBuilder进行遍历，删除前导'0'
+
+## 代码：
+
+```java
+import java.util.Scanner;
+
+/**
+ * @Description: 高精度乘法
+ * @Author: rickey-c
+ * @Date: 2025/2/13 15:34
+ */
+public class Multiply {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            String s1 = scanner.next();
+            String s2 = scanner.next();
+            System.out.println("s1 = " + s1 + " s2 = " + s2 + " res = " + mul(s1, s2));
+        }
+    }
+
+    public static String mul(String s1, String s2) {
+        if (s1.isEmpty() || s2.isEmpty()){
+            return "0";
+        }
+        int len1 = s1.length();
+        int len2 = s2.length();
+        int[] res = new int[len1 + len2];
+        for (int i = len1-1; i >= 0; i--) {
+            for (int j = len2-1; j >= 0; j--) {
+                int mul = (s1.charAt(i) - '0') * (s2.charAt(j) - '0');
+                int sum = mul + res[i + j + 1];
+                res[i + j + 1] = sum % 10;
+                res[i + j] = sum / 10;
+            }
+        }
+        // 收集结果，去掉前导0
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < res.length; i++) {
+            if (!(sb.isEmpty() && res[i] == 0)) {
+                sb.append(res[i]);
+            }
+        }
+        return sb.toString();
+    }
+}
+
+```
+
